@@ -1,0 +1,53 @@
+# Python-related files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.egg-info/
+*.eggs/
+
+# Environment files
+.env
+.env.*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Docker-related files
+docker-compose.override.yml
+.dockerignore
+
+# Build and distribution directories
+build/
+dist/
+*.egg
+*.egg-info/
+pip-wheel-metadata/
+
+# MinIO data
+miniogc_data/
+
+# Airflow output
+airflow_output/
+
+# Spark temporary files
+spark-warehouse/
+metastore_db/
+
+# VS Code settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Exclude large FASTA files
+/data
+*.fa
+*.fa.gz
