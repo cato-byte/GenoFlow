@@ -53,13 +53,13 @@ def main():
     df_cleaned.write.mode("overwrite").partitionBy("header_prefix").parquet("s3a://processed/cleaned_sequences.parquet")
 
     # Show basic metrics
-    logger.info("💡 Sample output:")
+    logger.info(" Sample output:")
     df_cleaned.show(5, truncate=False)
 
-    logger.info("🧠 Spark plan:")
+    logger.info(" Spark plan:")
     df_cleaned.explain(mode="formatted")
 
-    logger.info("✅ Done.")
+    logger.info(" Done.")
 
     spark.stop()
 

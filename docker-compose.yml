@@ -4,10 +4,10 @@ services:
   ##############################
   miniogc:
     image: minio/minio
-    container_name: miniogc
+    container_name: ${COMPOSE_PROJECT_NAME}_miniogc
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web UI
+      - "9100:9000"   # S3 API (host 9100 -> container 9000)
+      - "9101:9001"   # Web UI  (host 9101 -> container 9001)
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
@@ -15,18 +15,27 @@ services:
       - miniogc_data:/data
       - ./airflow_output:/opt/airflow/output
     command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   miniogc-init:
     image: minio/mc
-    container_name: minio-init
+    container_name: ${COMPOSE_PROJECT_NAME}_miniogc_init
     depends_on:
-      - miniogc
+      miniogc:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-        sleep 5;
-        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY};
-        mc mb -p local/raw;
-        mc mb -p local/processed;
+        set -e;
+        for i in $(seq 1 30); do
+          mc alias set local http://miniogc:9000 ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY} && break;
+          echo 'MinIO not ready yet...'; sleep 2;
+        done;
+        mc mb -p local/raw || true;
+        mc mb -p local/processed || true;
       "
     environment:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
@@ -37,6 +46,7 @@ services:
   ################################
   spark-preprocess:
     image: gc_predictor_spark-preprocess
+    container_name: ${COMPOSE_PROJECT_NAME}_spark_preprocess
     build:
       context: ./spark_preprocess
     volumes:
@@ -46,7 +56,7 @@ services:
       - miniogc
       - miniogc-init
     environment:
-      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ENDPOINT=miniogc:9000
       - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
       - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
     command: ["spark-submit", "run_preprocess.py"]
@@ -54,7 +64,7 @@ services:
   spark-tests:
     build:
       context: ./spark_preprocess
-    container_name: spark_tests
+    container_name: ${COMPOSE_PROJECT_NAME}_spark_tests
     command: ["pytest", "tests/"]
     volumes:
       - ./spark_preprocess:/app
@@ -66,6 +76,7 @@ services:
   ##############################
   ds-model:
     image: gc_predictor_ds-model
+    container_name: ${COMPOSE_PROJECT_NAME}_ds_model
     build:
       context: ./ds_model
     volumes:
@@ -76,7 +87,7 @@ services:
       - miniogc
       - miniogc-init
     environment:
-      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ENDPOINT=miniogc:9000
       - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
       - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
     command: ["python", "run_model.py"]
@@ -87,8 +98,9 @@ services:
   airflow:
     build:
       context: ./airflow
+    container_name: ${COMPOSE_PROJECT_NAME}_airflow
     ports:
-      - "8080:8080"
+      - "18080:8080"   # non-default host port for the UI
     environment:
       - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
       - AIRFLOW__CORE__FERNET_KEY=some_fernet_key
@@ -100,7 +112,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./airflow_output:/opt/airflow/output
-      - ./airflow/dags:/opt/airflow/dags  # ensure your DAGs live here
+      - ./airflow/dags:/opt/airflow/dags
 
   ##############################
   # ☁️ Airflow Scheduler
@@ -108,6 +120,7 @@ services:
   airflow-scheduler:
     build:
       context: ./airflow
+    container_name: ${COMPOSE_PROJECT_NAME}_airflow_scheduler
     depends_on:
       - airflow
     command: ["scheduler"]

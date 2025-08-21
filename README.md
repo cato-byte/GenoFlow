@@ -133,3 +133,15 @@ wget --timestamping \
 
 gunzip nanPar1.fa.gz
 
+Minio Access: run docker-compose up miniogc-init
+if you want to run only the container. 
+
+You need to create a .env file in your computer inside the project that stores the variables 
+
+MINIO_ACCESS_KEY
+MINIO_SECRET_KEY
+INPUT_FASTA_PATH
+OUTPUT_PARQUET_PATH
+MINIO_ENDPOINT
+
+You can access minio and see progress from your machine at localhost:9101
